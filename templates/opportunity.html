@@ -12,12 +12,12 @@
     <div style="color:#94a3b8;font-size:15px">{{ opp.role_title }}</div>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    {% if opp.fit_score %}
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 16px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:{% if opp.fit_score >= 8 %}#10b981{% elif opp.fit_score >= 6 %}#f59e0b{% else %}#ef4444{% endif %}">{{ opp.fit_score }}/10</div>
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 16px;text-align:center{% if not opp.fit_score %};opacity:.4{% endif %}">
+      <div id="fit-score-display" style="font-size:22px;font-weight:700;color:{% if opp.fit_score %}{% if opp.fit_score >= 8 %}#10b981{% elif opp.fit_score >= 6 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}#475569{% endif %}">
+        {% if opp.fit_score %}{{ opp.fit_score }}/10{% else %}—/10{% endif %}
+      </div>
       <div style="font-size:11px;color:#64748b">FIT SCORE</div>
     </div>
-    {% endif %}
     <span class="badge {% if opp.stage in ['Offer Pending'] %}badge-green{% elif opp.stage == 'Closed' %}badge-gray{% elif opp.stage in ['HM Interview','Loop'] %}badge-purple{% elif opp.stage == 'Recruiter Screen' %}badge-blue{% else %}badge-yellow{% endif %}" style="font-size:13px;padding:6px 12px">
       {{ opp.stage }}
     </span>
@@ -88,35 +88,45 @@
   <!-- Right column -->
   <div>
     <!-- AI Fit Summary -->
-    {% if fit_summary %}
-    <div class="card">
-      <h2>AI Fit Analysis</h2>
-      {% if fit_summary.score_rationale %}
-      <p style="font-size:13px;color:#cbd5e1;margin-bottom:12px">{{ fit_summary.score_rationale }}</p>
-      {% endif %}
-      {% if fit_summary.top_strengths %}
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Strengths</div>
-        {% for s in fit_summary.top_strengths %}
-        <div style="font-size:13px;color:#94a3b8;padding:2px 0">✓ {{ s }}</div>
-        {% endfor %}
+    <div class="card" id="fit-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin-bottom:0">AI Fit Analysis</h2>
+        <button class="btn btn-primary btn-sm" id="score-fit-btn" onclick="scoreFit(this)">
+          {% if fit_summary %}Re-score{% else %}Score Fit{% endif %}
+        </button>
       </div>
-      {% endif %}
-      {% if fit_summary.gaps_or_risks %}
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;color:#ef4444;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Gaps / Risks</div>
-        {% for g in fit_summary.gaps_or_risks %}
-        <div style="font-size:13px;color:#94a3b8;padding:2px 0">⚠ {{ g }}</div>
-        {% endfor %}
+      <div id="fit-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:8px"></div>
+      <div id="fit-results">
+        {% if fit_summary %}
+        {% if fit_summary.score_rationale %}
+        <p style="font-size:13px;color:#cbd5e1;margin-bottom:12px">{{ fit_summary.score_rationale }}</p>
+        {% endif %}
+        {% if fit_summary.top_strengths %}
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Strengths</div>
+          {% for s in fit_summary.top_strengths %}
+          <div style="font-size:13px;color:#94a3b8;padding:2px 0">✓ {{ s }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if fit_summary.gaps_or_risks %}
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:#ef4444;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Gaps / Risks</div>
+          {% for g in fit_summary.gaps_or_risks %}
+          <div style="font-size:13px;color:#94a3b8;padding:2px 0">⚠ {{ g }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if fit_summary.suggested_bullet_rewrite %}
+        <div style="background:#0f172a;border-radius:6px;padding:10px;font-size:12px;color:#a3e635;margin-top:8px">
+          💡 {{ fit_summary.suggested_bullet_rewrite }}
+        </div>
+        {% endif %}
+        {% else %}
+        <div style="color:#475569;font-size:13px">No fit analysis yet. Click "Score Fit" to run AI analysis against your resume.</div>
+        {% endif %}
       </div>
-      {% endif %}
-      {% if fit_summary.suggested_bullet_rewrite %}
-      <div style="background:#0f172a;border-radius:6px;padding:10px;font-size:12px;color:#a3e635;margin-top:8px">
-        💡 {{ fit_summary.suggested_bullet_rewrite }}
-      </div>
-      {% endif %}
     </div>
-    {% endif %}
 
     <!-- Keywords -->
     {% if keywords %}
@@ -129,6 +139,17 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- Interview Prep -->
+    <div class="card" id="prep-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin-bottom:0">Interview Prep</h2>
+        <button class="btn btn-ghost btn-sm" id="prep-btn" onclick="genPrep(this)">Generate Prep</button>
+      </div>
+      <div id="prep-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:8px"></div>
+      <div id="prep-placeholder" style="color:#475569;font-size:13px">Generate behavioral questions, technical questions, and a company briefing for this role.</div>
+      <div id="prep-results" style="display:none"></div>
+    </div>
 
     <!-- Contacts -->
     <div class="card">
@@ -148,8 +169,50 @@
       </div>
       {% endfor %}
       {% else %}
-      <div class="empty-state" style="padding:12px">No contacts yet. Use CLI: <code>python main.py add-contact {{ opp.id }}</code></div>
+      <div style="color:#475569;font-size:13px;padding:8px 0">No contacts added yet.</div>
       {% endif %}
+
+      <!-- Add Contact toggle -->
+      <div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="toggleAddContact()">＋ Add Contact</button>
+        <form id="add-contact-form" method="POST" action="/opportunity/{{ opp.id }}/add-contact" style="display:none;margin-top:14px">
+          <div class="form-group">
+            <label>Name *</label>
+            <input type="text" name="full_name" required placeholder="Jane Smith">
+          </div>
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" name="title" placeholder="Hiring Manager">
+          </div>
+          <div class="form-group">
+            <label>Company</label>
+            <input type="text" name="company" value="{{ opp.company }}">
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select name="contact_type">
+              <option value="Hiring Manager">Hiring Manager</option>
+              <option value="Recruiter" selected>Recruiter</option>
+              <option value="Peer">Peer</option>
+              <option value="Alumni">Alumni</option>
+              <option value="Referral Source">Referral Source</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" placeholder="jane@company.com">
+          </div>
+          <div class="form-group">
+            <label>LinkedIn URL</label>
+            <input type="url" name="linkedin_url" placeholder="https://linkedin.com/in/...">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button type="submit" class="btn btn-primary btn-sm">Add Contact</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAddContact()">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Activity Log -->
@@ -173,4 +236,127 @@
     </div>
   </div>
 </div>
+
+<script>
+const OPP_ID = {{ opp.id }};
+
+function scoreFit(btn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Scoring...';
+  document.getElementById('fit-error').style.display = 'none';
+
+  fetch('/opportunity/' + OPP_ID + '/score-fit', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      if (data.error) {
+        btn.textContent = orig;
+        const el = document.getElementById('fit-error');
+        el.textContent = data.error;
+        el.style.display = 'block';
+        return;
+      }
+      btn.textContent = 'Re-score';
+      const score = data.fit_score;
+      const scoreColor = score >= 8 ? '#10b981' : score >= 6 ? '#f59e0b' : '#ef4444';
+      // Update score badge in header
+      const scoreEl = document.getElementById('fit-score-display');
+      if (scoreEl) {
+        scoreEl.textContent = score + '/10';
+        scoreEl.style.color = scoreColor;
+      }
+      // Rebuild results section
+      let html = '';
+      if (data.score_rationale) {
+        html += '<p style="font-size:13px;color:#cbd5e1;margin-bottom:12px">' + data.score_rationale + '</p>';
+      }
+      if (data.top_strengths && data.top_strengths.length) {
+        html += '<div style="margin-bottom:10px"><div style="font-size:11px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Strengths</div>';
+        data.top_strengths.forEach(s => { html += '<div style="font-size:13px;color:#94a3b8;padding:2px 0">✓ ' + s + '</div>'; });
+        html += '</div>';
+      }
+      if (data.gaps_or_risks && data.gaps_or_risks.length) {
+        html += '<div style="margin-bottom:10px"><div style="font-size:11px;color:#ef4444;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Gaps / Risks</div>';
+        data.gaps_or_risks.forEach(g => { html += '<div style="font-size:13px;color:#94a3b8;padding:2px 0">⚠ ' + g + '</div>'; });
+        html += '</div>';
+      }
+      if (data.ats_keywords && data.ats_keywords.length) {
+        html += '<div style="margin-bottom:10px"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">ATS Keywords</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+        data.ats_keywords.forEach(k => { html += '<span class="badge badge-gray">' + k + '</span>'; });
+        html += '</div></div>';
+      }
+      if (data.suggested_bullet_rewrite) {
+        html += '<div style="background:#0f172a;border-radius:6px;padding:10px;font-size:12px;color:#a3e635;margin-top:8px">💡 ' + data.suggested_bullet_rewrite + '</div>';
+      }
+      document.getElementById('fit-results').innerHTML = html;
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = orig;
+      const el = document.getElementById('fit-error');
+      el.textContent = 'Request failed. Check the server logs.';
+      el.style.display = 'block';
+    });
+}
+
+function genPrep(btn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Generating...';
+  document.getElementById('prep-error').style.display = 'none';
+
+  fetch('/opportunity/' + OPP_ID + '/interview-prep', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      if (data.error) {
+        btn.textContent = orig;
+        const el = document.getElementById('prep-error');
+        el.textContent = data.error;
+        el.style.display = 'block';
+        return;
+      }
+      btn.textContent = 'Re-generate';
+      document.getElementById('prep-placeholder').style.display = 'none';
+      let html = '';
+      if (data.company_briefing) {
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Company Briefing</div><p style="font-size:13px;color:#cbd5e1">' + data.company_briefing + '</p></div>';
+      }
+      if (data.watch_out_for) {
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;color:#f59e0b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Watch Out For</div><p style="font-size:13px;color:#94a3b8">⚠ ' + data.watch_out_for + '</p></div>';
+      }
+      if (data.behavioral_questions && data.behavioral_questions.length) {
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Behavioral Questions</div>';
+        data.behavioral_questions.forEach((q, i) => { html += '<div style="font-size:13px;color:#94a3b8;padding:3px 0">' + (i+1) + '. ' + q + '</div>'; });
+        html += '</div>';
+      }
+      if (data.technical_questions && data.technical_questions.length) {
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;color:#c4b5fd;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Technical Questions</div>';
+        data.technical_questions.forEach((q, i) => { html += '<div style="font-size:13px;color:#94a3b8;padding:3px 0">' + (i+1) + '. ' + q + '</div>'; });
+        html += '</div>';
+      }
+      if (data.questions_to_ask_them && data.questions_to_ask_them.length) {
+        html += '<div><div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Questions to Ask Them</div>';
+        data.questions_to_ask_them.forEach((q, i) => { html += '<div style="font-size:13px;color:#94a3b8;padding:3px 0">' + (i+1) + '. ' + q + '</div>'; });
+        html += '</div>';
+      }
+      const results = document.getElementById('prep-results');
+      results.innerHTML = html;
+      results.style.display = 'block';
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = orig;
+      const el = document.getElementById('prep-error');
+      el.textContent = 'Request failed. Check the server logs.';
+      el.style.display = 'block';
+    });
+}
+
+function toggleAddContact() {
+  const form = document.getElementById('add-contact-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {% endblock %}

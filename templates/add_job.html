@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Add Job — Job Search Ops{% endblock %}
+{% block content %}
+
+<h1>Add Job to Pipeline</h1>
+
+{% if error %}
+<div class="alert alert-warn">{{ error }}</div>
+{% endif %}
+
+{% if step == 1 %}
+
+<div class="card" style="max-width:620px">
+  <p style="font-size:13px;color:#64748b;margin-bottom:20px">
+    Paste a job posting URL or the full JD text. AI will extract the key details.
+  </p>
+  <form method="POST" action="/add-job">
+    <input type="hidden" name="step" value="extract">
+    <div class="form-group">
+      <label>Job Posting URL or JD Text</label>
+      <textarea name="source_input" rows="5" placeholder="https://linkedin.com/jobs/view/...&#10;&#10;— or —&#10;&#10;Paste the full job description here..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Extract with AI →</button>
+  </form>
+</div>
+
+{% elif step == 2 %}
+
+<div style="margin-bottom:16px">
+  <a href="/add-job" style="color:#64748b;font-size:13px">← Start over</a>
+</div>
+
+<div class="grid-2" style="max-width:960px">
+  <div>
+    <div class="card">
+      <h2 style="margin-bottom:4px">Confirm Job Details</h2>
+      <p style="font-size:13px;color:#64748b;margin-bottom:20px">AI extracted the following — review and edit before saving.</p>
+
+      <form method="POST" action="/add-job">
+        <input type="hidden" name="step" value="save">
+        <input type="hidden" name="jd_raw" value="{{ extracted.jd_raw | e }}">
+        <input type="hidden" name="jd_url" value="{{ extracted.jd_url | e }}">
+        <input type="hidden" name="jd_keywords" value="{{ extracted.jd_keywords | e }}">
+
+        <div class="form-group">
+          <label>Company *</label>
+          <input type="text" name="company" value="{{ extracted.company }}" required placeholder="Acme Corp">
+        </div>
+        <div class="form-group">
+          <label>Role Title *</label>
+          <input type="text" name="role_title" value="{{ extracted.role_title }}" required placeholder="Analytics Manager">
+        </div>
+        <div class="form-group">
+          <label>Job Family</label>
+          <select name="job_family">
+            <option value="">— Select —</option>
+            {% for code, name in job_families.items() %}
+            <option value="{{ code }}" {% if extracted.job_family == code %}selected{% endif %}>{{ code }} — {{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tier</label>
+          <select name="tier">
+            <option value="1">T1 — Top Priority</option>
+            <option value="2" selected>T2 — Strong Fit</option>
+            <option value="3">T3 — Exploratory</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Source</label>
+          <select name="source_label">
+            <option value="LinkedIn" selected>LinkedIn</option>
+            <option value="Referral">Referral</option>
+            <option value="Job Board">Job Board</option>
+            <option value="Outbound">Outbound</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Salary Range</label>
+          <input type="text" name="salary_range" value="{{ extracted.salary_range }}" placeholder="$130k–$160k">
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="submit" class="btn btn-primary">Save to Pipeline</button>
+          <a href="/add-job" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if extracted.keywords %}
+  <div>
+    <div class="card">
+      <h2>Extracted Keywords</h2>
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">These ATS keywords were extracted from the JD and will be saved with the opportunity.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for kw in extracted.keywords %}
+        <span class="badge badge-gray">{{ kw }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% if extracted.jd_url %}
+    <div class="card">
+      <h2>Source URL</h2>
+      <a href="{{ extracted.jd_url }}" target="_blank" style="font-size:13px;word-break:break-all">{{ extracted.jd_url }} ↗</a>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endif %}
+
+{% endblock %}
