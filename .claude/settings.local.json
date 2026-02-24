@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git add models/__init__.py modules/__init__.py db/__init__.py web/__init__.py)",
       "Bash(git add config.py db/schema.sql main.py web/app.py)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git add README.md)"
     ]
   }
 }
