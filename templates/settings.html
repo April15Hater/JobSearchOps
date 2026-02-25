@@ -15,6 +15,38 @@
 {% endif %}
 
 <div class="card" style="max-width:800px;margin-bottom:20px">
+  <h2>Email / SMTP</h2>
+  <p style="font-size:13px;color:#64748b;margin-bottom:16px">
+    LAN relay settings used when sending outreach and thank-you emails from the web UI.
+    Overrides the env-var defaults without touching <code style="background:#0f172a;padding:2px 6px;border-radius:4px">.env</code>.
+  </p>
+  <form method="POST" action="/settings">
+    <input type="hidden" name="section" value="smtp">
+    <div style="display:grid;grid-template-columns:1fr 120px;gap:16px">
+      <div class="form-group">
+        <label>SMTP Host</label>
+        <input type="text" name="smtp_host" value="{{ smtp_host }}">
+      </div>
+      <div class="form-group">
+        <label>Port</label>
+        <input type="number" name="smtp_port" value="{{ smtp_port }}">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group">
+        <label>From Address</label>
+        <input type="text" name="smtp_from" value="{{ smtp_from }}">
+      </div>
+      <div class="form-group">
+        <label>Sender Name</label>
+        <input type="text" name="sender_name" value="{{ sender_name }}">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save SMTP</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:800px;margin-bottom:20px">
   <h2>Scheduler</h2>
   <p style="font-size:13px;color:#64748b;margin-bottom:16px">
     Daily digest and stale-record check are run automatically at this time while the dashboard is running.

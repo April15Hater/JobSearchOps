@@ -16,7 +16,10 @@ from modules.workflow import (
     get_today_queue, get_pipeline_summary, get_followup_queue,
     flag_stale_records, advance_stage, calculate_next_action
 )
-from config import STAGE_ORDER, JOB_FAMILIES, RESUME_CACHE_PATH, APP_SETTINGS_PATH
+from config import (
+    STAGE_ORDER, JOB_FAMILIES, RESUME_CACHE_PATH, APP_SETTINGS_PATH,
+    SMTP_HOST, SMTP_PORT, SMTP_FROM, SENDER_NAME,
+)
 
 
 def register_routes(app):
@@ -421,6 +424,10 @@ def register_routes(app):
             except Exception:
                 pass
         digest_time = app_settings.get("digest_time", "08:00")
+        smtp_host = app_settings.get("smtp_host", SMTP_HOST)
+        smtp_port = app_settings.get("smtp_port", str(SMTP_PORT))
+        smtp_from = app_settings.get("smtp_from", SMTP_FROM)
+        sender_name = app_settings.get("sender_name", SENDER_NAME)
 
         # --- Load resume text ---
         resume_text = ""
@@ -431,26 +438,172 @@ def register_routes(app):
                 error = f"Could not read resume file: {e}"
 
         if request.method == "POST":
-            new_text = request.form.get("resume_text", "")
-            new_digest_time = request.form.get("digest_time", "08:00").strip() or "08:00"
-            try:
-                with open(RESUME_CACHE_PATH, "w", encoding="utf-8") as f:
-                    f.write(new_text)
-                app_settings["digest_time"] = new_digest_time
-                with open(APP_SETTINGS_PATH, "w", encoding="utf-8") as f:
-                    json.dump(app_settings, f, indent=2)
-                # Live-reschedule if digest time changed
-                if new_digest_time != digest_time:
-                    try:
-                        from modules.scheduler import reschedule
-                        reschedule(new_digest_time)
-                    except Exception:
-                        pass
-                return redirect(url_for("settings") + "?saved=1")
-            except Exception as e:
-                error = f"Could not save settings: {e}"
-                resume_text = new_text
-                digest_time = new_digest_time
+            section = request.form.get("section", "resume")
 
-        return render_template("settings.html", resume_text=resume_text, saved=saved, error=error,
-                               resume_path=RESUME_CACHE_PATH, digest_time=digest_time)
+            if section == "smtp":
+                smtp_host = request.form.get("smtp_host", "").strip() or SMTP_HOST
+                smtp_port = request.form.get("smtp_port", "").strip() or str(SMTP_PORT)
+                smtp_from = request.form.get("smtp_from", "").strip() or SMTP_FROM
+                sender_name = request.form.get("sender_name", "").strip() or SENDER_NAME
+                try:
+                    app_settings["smtp_host"] = smtp_host
+                    app_settings["smtp_port"] = smtp_port
+                    app_settings["smtp_from"] = smtp_from
+                    app_settings["sender_name"] = sender_name
+                    with open(APP_SETTINGS_PATH, "w", encoding="utf-8") as f:
+                        json.dump(app_settings, f, indent=2)
+                    return redirect(url_for("settings") + "?saved=1")
+                except Exception as e:
+                    error = f"Could not save SMTP settings: {e}"
+            else:
+                new_text = request.form.get("resume_text", "")
+                new_digest_time = request.form.get("digest_time", "08:00").strip() or "08:00"
+                try:
+                    with open(RESUME_CACHE_PATH, "w", encoding="utf-8") as f:
+                        f.write(new_text)
+                    app_settings["digest_time"] = new_digest_time
+                    with open(APP_SETTINGS_PATH, "w", encoding="utf-8") as f:
+                        json.dump(app_settings, f, indent=2)
+                    if new_digest_time != digest_time:
+                        try:
+                            from modules.scheduler import reschedule
+                            reschedule(new_digest_time)
+                        except Exception:
+                            pass
+                    return redirect(url_for("settings") + "?saved=1")
+                except Exception as e:
+                    error = f"Could not save settings: {e}"
+                    resume_text = new_text
+                    digest_time = new_digest_time
+
+        return render_template(
+            "settings.html",
+            resume_text=resume_text, saved=saved, error=error,
+            resume_path=RESUME_CACHE_PATH, digest_time=digest_time,
+            smtp_host=smtp_host, smtp_port=smtp_port,
+            smtp_from=smtp_from, sender_name=sender_name,
+        )
+
+    @app.route("/metrics")
+    def metrics():
+        from db.database import execute_query
+
+        # Stage counts, avg fit, avg days open
+        stage_rows = execute_query("""
+            SELECT stage, COUNT(*) as count,
+                   ROUND(AVG(fit_score), 1) as avg_fit,
+                   ROUND(AVG(julianday('now') - julianday(date_added)), 0) as avg_days_open
+            FROM opportunities
+            GROUP BY stage
+            ORDER BY CASE stage
+                WHEN 'Prospect' THEN 1 WHEN 'Warm Lead' THEN 2 WHEN 'Applied' THEN 3
+                WHEN 'Recruiter Screen' THEN 4 WHEN 'HM Interview' THEN 5
+                WHEN 'Loop' THEN 6 WHEN 'Offer Pending' THEN 7 WHEN 'Closed' THEN 8
+                ELSE 9 END
+        """, fetch='all')
+        stages = [dict(r) for r in (stage_rows or [])]
+        max_count = max((s['count'] for s in stages), default=1)
+        for s in stages:
+            s['pct'] = round(s['count'] / max_count * 100)
+
+        # Top-line totals
+        totals_row = execute_query("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN stage != 'Closed' THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN stage = 'Applied' THEN 1 ELSE 0 END) as applied,
+                SUM(CASE WHEN stage IN ('Recruiter Screen','HM Interview','Loop','Offer Pending') THEN 1 ELSE 0 END) as interviews,
+                SUM(CASE WHEN stage = 'Closed' AND close_reason = 'Accepted' THEN 1 ELSE 0 END) as offers
+            FROM opportunities
+        """, fetch='one')
+        totals = dict(totals_row) if totals_row else {}
+
+        # Close reasons
+        close_rows = execute_query("""
+            SELECT COALESCE(close_reason, 'Unknown') as reason, COUNT(*) as count
+            FROM opportunities WHERE stage = 'Closed'
+            GROUP BY close_reason ORDER BY count DESC
+        """, fetch='all')
+        close_reasons = [dict(r) for r in (close_rows or [])]
+
+        # Source breakdown
+        source_rows = execute_query("""
+            SELECT source, COUNT(*) as total,
+                   SUM(CASE WHEN stage NOT IN ('Closed','Prospect') THEN 1 ELSE 0 END) as progressed,
+                   SUM(CASE WHEN stage = 'Closed' AND close_reason = 'Accepted' THEN 1 ELSE 0 END) as accepted
+            FROM opportunities WHERE source IS NOT NULL
+            GROUP BY source ORDER BY total DESC
+        """, fetch='all')
+        sources = [dict(r) for r in (source_rows or [])]
+
+        # Tier breakdown
+        tier_rows = execute_query("""
+            SELECT tier, COUNT(*) as total,
+                   SUM(CASE WHEN stage NOT IN ('Closed','Prospect') THEN 1 ELSE 0 END) as progressed,
+                   ROUND(AVG(fit_score), 1) as avg_fit
+            FROM opportunities WHERE tier IS NOT NULL
+            GROUP BY tier ORDER BY tier
+        """, fetch='all')
+        tiers = [dict(r) for r in (tier_rows or [])]
+
+        # Outreach / contact stats
+        outreach_row = execute_query("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN outreach_day0 IS NOT NULL THEN 1 ELSE 0 END) as contacted,
+                SUM(CASE WHEN response_status IN ('Responded','Meeting Scheduled') THEN 1 ELSE 0 END) as responded,
+                SUM(CASE WHEN response_status = 'Meeting Scheduled' THEN 1 ELSE 0 END) as meetings
+            FROM contacts
+        """, fetch='one')
+        outreach = dict(outreach_row) if outreach_row else {}
+        contacted = outreach.get('contacted') or 0
+        outreach['response_rate'] = (
+            round(outreach['responded'] / contacted * 100, 1) if contacted > 0 else 0
+        )
+
+        # Fit score distribution (scores 1-10)
+        fit_rows = execute_query("""
+            SELECT fit_score, COUNT(*) as count
+            FROM opportunities WHERE fit_score IS NOT NULL
+            GROUP BY fit_score ORDER BY fit_score
+        """, fetch='all')
+        fit_map = {r['fit_score']: r['count'] for r in (fit_rows or [])}
+        fit_max = max(fit_map.values(), default=1)
+        fit_scores = [
+            {'score': i, 'count': fit_map.get(i, 0), 'pct': round(fit_map.get(i, 0) / fit_max * 100)}
+            for i in range(1, 11)
+        ]
+
+        # Job family breakdown
+        family_rows = execute_query("""
+            SELECT job_family, COUNT(*) as total,
+                   SUM(CASE WHEN stage != 'Closed' THEN 1 ELSE 0 END) as active,
+                   ROUND(AVG(fit_score), 1) as avg_fit
+            FROM opportunities WHERE job_family IS NOT NULL
+            GROUP BY job_family ORDER BY total DESC
+        """, fetch='all')
+        families = [dict(r) for r in (family_rows or [])]
+
+        # Recent activity — last 14 days, excluding noise
+        activity_rows = execute_query("""
+            SELECT activity_type, COUNT(*) as count
+            FROM activity_log
+            WHERE created_at >= date('now', '-14 days')
+              AND activity_type NOT IN ('AI Action', 'Note Added')
+            GROUP BY activity_type ORDER BY count DESC
+        """, fetch='all')
+        recent_activity = [dict(r) for r in (activity_rows or [])]
+
+        return render_template(
+            "metrics.html",
+            stages=stages,
+            totals=totals,
+            close_reasons=close_reasons,
+            sources=sources,
+            tiers=tiers,
+            outreach=outreach,
+            fit_scores=fit_scores,
+            families=families,
+            recent_activity=recent_activity,
+            job_families=JOB_FAMILIES,
+        )

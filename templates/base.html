@@ -58,6 +58,7 @@
     <a href="/" {% if request.endpoint == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
     <a href="/opportunities" {% if request.endpoint in ['opportunities','opportunity_detail'] %}class="active"{% endif %}>Pipeline</a>
     <a href="/contacts" {% if request.endpoint == 'contacts' %}class="active"{% endif %}>Contacts</a>
+    <a href="/metrics" {% if request.endpoint == 'metrics' %}class="active"{% endif %}>Metrics</a>
     <a href="/settings" {% if request.endpoint == 'settings' %}class="active"{% endif %}>Settings</a>
     <a href="/add-job" {% if request.endpoint == 'add_job' %}class="active"{% endif %} style="margin-left:auto;background:#1d4ed8;color:#bfdbfe;padding:5px 12px;border-radius:6px;font-size:13px">＋ Add Job</a>
   </nav>

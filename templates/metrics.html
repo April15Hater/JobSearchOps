@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Metrics — Job Search Ops{% endblock %}
+{% block content %}
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+  <h1 style="margin-bottom:0">Metrics</h1>
+  <span style="font-size:13px;color:#475569">Pipeline performance overview</span>
+</div>
+
+<!-- Top-line stat cards -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px">
+  <div class="stat-card">
+    <div class="value">{{ totals.total or 0 }}</div>
+    <div class="label">Total</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ totals.active or 0 }}</div>
+    <div class="label">Active</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ totals.applied or 0 }}</div>
+    <div class="label">Applied</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:#8b5cf6">{{ totals.interviews or 0 }}</div>
+    <div class="label">Interviewing</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:{% if (outreach.response_rate or 0) >= 30 %}#10b981{% elif (outreach.response_rate or 0) >= 15 %}#f59e0b{% else %}#ef4444{% endif %}">
+      {{ outreach.response_rate or 0 }}%
+    </div>
+    <div class="label">Response Rate</div>
+  </div>
+</div>
+
+<!-- Pipeline funnel + Outreach -->
+<div class="grid-2">
+
+  <!-- Pipeline funnel -->
+  <div class="card">
+    <h2>Pipeline by Stage</h2>
+    {% if stages %}
+    {% for s in stages %}
+    <div style="margin:12px 0">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+        <span style="color:#94a3b8;font-weight:500">{{ s.stage }}</span>
+        <span style="color:#475569">
+          {{ s.count }} opp{% if s.count != 1 %}s{% endif %}
+          {% if s.avg_fit %}&nbsp;·&nbsp;<span style="color:#f59e0b">{{ s.avg_fit }}/10</span>{% endif %}
+          {% if s.avg_days_open %}&nbsp;·&nbsp;{{ s.avg_days_open|int }}d avg{% endif %}
+        </span>
+      </div>
+      <div style="background:#0f172a;border-radius:4px;height:16px;overflow:hidden">
+        <div style="height:100%;width:{{ s.pct }}%;border-radius:4px;background:
+          {% if s.stage == 'Offer Pending' %}#10b981
+          {% elif s.stage in ['HM Interview','Loop'] %}#8b5cf6
+          {% elif s.stage == 'Recruiter Screen' %}#3b82f6
+          {% elif s.stage == 'Applied' %}#f59e0b
+          {% elif s.stage == 'Closed' %}#475569
+          {% else %}#334155{% endif %};
+          transition:width .3s"></div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">No opportunities yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Outreach + Closed outcomes -->
+  <div>
+    <div class="card">
+      <h2>Outreach</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px">
+        <div class="stat-card" style="padding:14px">
+          <div class="value" style="font-size:24px">{{ outreach.contacted or 0 }}</div>
+          <div class="label">Contacted</div>
+        </div>
+        <div class="stat-card" style="padding:14px">
+          <div class="value" style="font-size:24px;color:#10b981">{{ outreach.responded or 0 }}</div>
+          <div class="label">Responded</div>
+        </div>
+        <div class="stat-card" style="padding:14px">
+          <div class="value" style="font-size:24px;color:#3b82f6">{{ outreach.meetings or 0 }}</div>
+          <div class="label">Meetings</div>
+        </div>
+        <div class="stat-card" style="padding:14px">
+          <div class="value" style="font-size:24px;color:{% if (outreach.response_rate or 0) >= 30 %}#10b981{% elif (outreach.response_rate or 0) >= 15 %}#f59e0b{% else %}#ef4444{% endif %}">
+            {{ outreach.response_rate or 0 }}%
+          </div>
+          <div class="label">Response Rate</div>
+        </div>
+      </div>
+    </div>
+
+    {% if close_reasons %}
+    <div class="card">
+      <h2>Closed Outcomes</h2>
+      {% for r in close_reasons %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b{% if loop.last %};border-bottom:none{% endif %}">
+        <span style="font-size:13px;color:#94a3b8">{{ r.reason }}</span>
+        <span class="badge {% if r.reason == 'Accepted' %}badge-green{% elif r.reason in ['Rejected','Ghosted'] %}badge-red{% elif r.reason == 'Withdrew' %}badge-yellow{% else %}badge-gray{% endif %}">{{ r.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Fit score distribution -->
+<div class="card">
+  <h2>Fit Score Distribution</h2>
+  {% set has_fit = fit_scores | selectattr('count') | list %}
+  {% if has_fit %}
+  <div style="display:flex;align-items:flex-end;gap:6px;height:80px;margin-bottom:8px">
+    {% for f in fit_scores %}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+      {% if f.count %}
+      <div style="font-size:10px;color:#64748b;margin-bottom:3px">{{ f.count }}</div>
+      <div style="width:100%;background:
+        {% if f.score >= 8 %}#10b981
+        {% elif f.score >= 6 %}#f59e0b
+        {% else %}#ef4444{% endif %};
+        height:{{ [f.pct, 4] | max }}%;border-radius:3px 3px 0 0"></div>
+      {% else %}
+      <div style="width:100%;height:3px;background:#1e293b;border-radius:2px;margin-top:auto"></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:6px;border-top:1px solid #334155;padding-top:6px">
+    {% for f in fit_scores %}
+    <div style="flex:1;text-align:center;font-size:11px;color:#475569">{{ f.score }}</div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:16px;margin-top:10px;font-size:12px">
+    <span style="color:#ef4444">■ 1–5 weak</span>
+    <span style="color:#f59e0b">■ 6–7 solid</span>
+    <span style="color:#10b981">■ 8–10 strong</span>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:12px">No fit scores yet — run Score Fit on some opportunities.</div>
+  {% endif %}
+</div>
+
+<!-- Source / Tier / Job Family -->
+<div class="grid-3">
+
+  <div class="card">
+    <h2>By Source</h2>
+    {% if sources %}
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">Progressed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sources %}
+        <tr>
+          <td>{{ s.source or '—' }}</td>
+          <td style="text-align:right">{{ s.total }}</td>
+          <td style="text-align:right;color:{% if s.progressed > 0 %}#10b981{% else %}#475569{% endif %}">{{ s.progressed }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:8px">No data.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>By Tier</h2>
+    {% if tiers %}
+    <table>
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">Past Prospect</th>
+          <th style="text-align:right">Avg Fit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tiers %}
+        <tr>
+          <td>T{{ t.tier }}</td>
+          <td style="text-align:right">{{ t.total }}</td>
+          <td style="text-align:right;color:{% if t.progressed > 0 %}#10b981{% else %}#475569{% endif %}">{{ t.progressed }}</td>
+          <td style="text-align:right;color:#f59e0b">{{ t.avg_fit or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:8px">No data.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>By Job Family</h2>
+    {% if families %}
+    <table>
+      <thead>
+        <tr>
+          <th>Family</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">Active</th>
+          <th style="text-align:right">Avg Fit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in families %}
+        <tr>
+          <td>{{ job_families.get(f.job_family, f.job_family) }}</td>
+          <td style="text-align:right">{{ f.total }}</td>
+          <td style="text-align:right;color:{% if f.active > 0 %}#10b981{% else %}#475569{% endif %}">{{ f.active }}</td>
+          <td style="text-align:right;color:#f59e0b">{{ f.avg_fit or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:8px">No data.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Recent Activity -->
+{% if recent_activity %}
+<div class="card">
+  <h2>Activity — Last 14 Days</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:12px">
+    {% for a in recent_activity %}
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px 20px;text-align:center;min-width:130px">
+      <div style="font-size:28px;font-weight:700;color:#e2e8f0">{{ a.count }}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.04em">{{ a.activity_type }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
