@@ -47,14 +47,17 @@ def get_followup_queue() -> list[dict]:
                   o.id as opportunity_id, o.company as opp_company,
                   o.role_title, o.stage,
                   CASE
-                    WHEN c.outreach_day0 = ? THEN 'Day 3 follow-up due'
-                    WHEN c.outreach_day0 = ? THEN 'Day 7 follow-up due'
+                    WHEN c.outreach_day0 = ? AND c.outreach_day3 IS NULL THEN 'Day 3 follow-up due'
+                    WHEN c.outreach_day0 = ? AND c.outreach_day7 IS NULL THEN 'Day 7 follow-up due'
                   END as followup_reason
            FROM contacts c
            JOIN opportunities o ON o.id = c.opportunity_id
            WHERE c.response_status = 'Pending'
-             AND (c.outreach_day0 = ? OR c.outreach_day0 = ?)
              AND o.stage != 'Closed'
+             AND (
+               (c.outreach_day0 = ? AND c.outreach_day3 IS NULL)
+               OR (c.outreach_day0 = ? AND c.outreach_day7 IS NULL)
+             )
            ORDER BY c.outreach_day0 ASC""",
         (day3, day7, day3, day7),
         fetch="all"

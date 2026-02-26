@@ -111,7 +111,6 @@ def register_routes(app):
             return "Opportunity not found", 404
         contacts = list_contacts(opportunity_id=opp_id)
         activity = get_activity_log(opportunity_id=opp_id)
-        import json
         fit_summary = None
         if opp.ai_fit_summary:
             try:
@@ -454,7 +453,7 @@ def register_routes(app):
         today_str = date.today().isoformat()
         if email_type == "outreach" and not contact.outreach_day0:
             update_contact(contact_id, outreach_day0=today_str)
-        activity_label = "Outreach Sent" if email_type == "outreach" else "Thank You Sent"
+        activity_label = "Outreach Sent" if email_type == "outreach" else "Follow-Up Sent"
         log_activity(
             activity_type=activity_label,
             description=f"Email sent to {contact.full_name} <{contact.email}>: {subject}",
