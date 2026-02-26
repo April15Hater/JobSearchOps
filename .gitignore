@@ -1,1 +1,20 @@
+# Sensitive / personal data
+.env
+.env.local
+.resume_cache.txt
+app_settings.json
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Claude Code local settings
 .claude/settings.local.json
