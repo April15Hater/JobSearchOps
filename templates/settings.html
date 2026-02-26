@@ -86,6 +86,29 @@
   </form>
 </div>
 
+<div class="card" style="max-width:800px;margin-bottom:20px">
+  <h2>Document Templates</h2>
+  <p style="font-size:13px;color:#64748b;margin-bottom:16px">
+    Optional .docx template files used when exporting resumes and cover letters.
+    Each template must contain the corresponding placeholder text on its own line.<br>
+    <span style="font-size:12px">Resume placeholder: <code style="background:#0f172a;padding:2px 6px;border-radius:4px">[RESUME_CONTENT]</code> &nbsp;|&nbsp;
+    Cover letter placeholder: <code style="background:#0f172a;padding:2px 6px;border-radius:4px">[COVER_LETTER_CONTENT]</code></span><br>
+    <span style="font-size:12px;color:#475569">Leave blank to use the built-in format.</span>
+  </p>
+  <form method="POST" action="/settings">
+    <input type="hidden" name="section" value="templates">
+    <div class="form-group">
+      <label>Resume Template Path (.docx)</label>
+      <input type="text" name="resume_template_path" value="{{ resume_template_path }}" placeholder="C:\Users\you\templates\resume_template.docx">
+    </div>
+    <div class="form-group">
+      <label>Cover Letter Template Path (.docx)</label>
+      <input type="text" name="cover_letter_template_path" value="{{ cover_letter_template_path }}" placeholder="C:\Users\you\templates\cover_letter_template.docx">
+    </div>
+    <button type="submit" class="btn btn-primary">Save Templates</button>
+  </form>
+</div>
+
 <div class="card" style="max-width:800px">
   <h2>Resume Cache</h2>
   <p style="font-size:13px;color:#64748b;margin-bottom:16px">

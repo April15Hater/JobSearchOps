@@ -52,6 +52,7 @@ def init_db():
     # Migrations: add new columns to existing tables (idempotent)
     for migration_sql in [
         "ALTER TABLE opportunities ADD COLUMN tailored_resume TEXT",
+        "ALTER TABLE opportunities ADD COLUMN cover_letter TEXT",
     ]:
         try:
             conn.execute(migration_sql)

@@ -171,8 +171,9 @@
       <div id="resume-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:8px"></div>
       <div id="resume-output" style="{% if not opp.tailored_resume %}display:none;{% endif %}">
         <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:14px;font-size:12px;color:#e2e8f0;white-space:pre-wrap;max-height:400px;overflow-y:auto;font-family:monospace;line-height:1.6" id="resume-text">{{ opp.tailored_resume or '' }}</div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="copyResume()">Copy to Clipboard</button>
+          <a id="resume-export-link" href="/opportunity/{{ opp.id }}/export-resume" class="btn btn-ghost btn-sm" {% if not opp.tailored_resume %}style="display:none"{% endif %}>Export DOCX</a>
           <span id="resume-copy-confirm" style="display:none;font-size:12px;color:#10b981">Copied!</span>
         </div>
         <div id="resume-changes" style="margin-top:12px;display:none">
@@ -182,6 +183,28 @@
       </div>
       {% if not opp.tailored_resume %}
       <div id="resume-placeholder" style="color:#475569;font-size:13px">Generate a full resume rewritten for this specific role and JD.</div>
+      {% endif %}
+    </div>
+
+    <!-- Cover Letter -->
+    <div class="card" id="cl-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin-bottom:0">Cover Letter</h2>
+        <button class="btn btn-ghost btn-sm" id="cl-btn" onclick="genCoverLetter(this)">
+          {% if opp.cover_letter %}Regenerate{% else %}Generate{% endif %}
+        </button>
+      </div>
+      <div id="cl-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:8px"></div>
+      <div id="cl-output" style="{% if not opp.cover_letter %}display:none;{% endif %}">
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:14px;font-size:12px;color:#e2e8f0;white-space:pre-wrap;max-height:360px;overflow-y:auto;font-family:monospace;line-height:1.6" id="cl-text">{{ opp.cover_letter or '' }}</div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="copyCL()">Copy to Clipboard</button>
+          <a id="cl-export-link" href="/opportunity/{{ opp.id }}/export-cover-letter" class="btn btn-ghost btn-sm" {% if not opp.cover_letter %}style="display:none"{% endif %}>Export DOCX</a>
+          <span id="cl-copy-confirm" style="display:none;font-size:12px;color:#10b981">Copied!</span>
+        </div>
+      </div>
+      {% if not opp.cover_letter %}
+      <div id="cl-placeholder" style="color:#475569;font-size:13px">Generate a cover letter tailored to this role and JD.</div>
       {% endif %}
     </div>
 
@@ -336,6 +359,8 @@ function genResume(btn) {
       if (placeholder) placeholder.style.display = 'none';
       document.getElementById('resume-text').textContent = data.tailored_resume || '';
       document.getElementById('resume-output').style.display = 'block';
+      const exportLink = document.getElementById('resume-export-link');
+      if (exportLink) exportLink.style.display = 'inline-block';
       if (data.key_changes && data.key_changes.length) {
         const list = document.getElementById('resume-changes-list');
         list.innerHTML = '';
@@ -354,6 +379,49 @@ function genResume(btn) {
       el.textContent = 'Request failed. Check the server logs.';
       el.style.display = 'block';
     });
+}
+
+function genCoverLetter(btn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Generating...';
+  document.getElementById('cl-error').style.display = 'none';
+
+  fetch('/opportunity/' + OPP_ID + '/generate-cover-letter', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      if (data.error) {
+        btn.textContent = orig;
+        const el = document.getElementById('cl-error');
+        el.textContent = data.error;
+        el.style.display = 'block';
+        return;
+      }
+      btn.textContent = 'Regenerate';
+      const placeholder = document.getElementById('cl-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      document.getElementById('cl-text').textContent = data.cover_letter || '';
+      document.getElementById('cl-output').style.display = 'block';
+      const exportLink = document.getElementById('cl-export-link');
+      if (exportLink) exportLink.style.display = 'inline-block';
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = orig;
+      const el = document.getElementById('cl-error');
+      el.textContent = 'Request failed. Check the server logs.';
+      el.style.display = 'block';
+    });
+}
+
+function copyCL() {
+  const text = document.getElementById('cl-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const confirm = document.getElementById('cl-copy-confirm');
+    confirm.style.display = 'inline';
+    setTimeout(() => { confirm.style.display = 'none'; }, 2000);
+  });
 }
 
 function copyResume() {

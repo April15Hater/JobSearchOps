@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import os
+import re
 from datetime import date, timedelta
 
 from flask import render_template, request, redirect, url_for, jsonify, flash, make_response
@@ -20,6 +21,17 @@ from config import (
     STAGE_ORDER, JOB_FAMILIES, RESUME_CACHE_PATH, APP_SETTINGS_PATH,
     SMTP_HOST, SMTP_PORT, SMTP_FROM, SENDER_NAME,
 )
+
+
+def _load_app_settings() -> dict:
+    """Load app_settings.json; return empty dict if missing or malformed."""
+    try:
+        if os.path.exists(APP_SETTINGS_PATH):
+            with open(APP_SETTINGS_PATH, encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
 
 
 def register_routes(app):
@@ -225,6 +237,64 @@ def register_routes(app):
         result = generate_tailored_resume(resume_text, opp.jd_raw, opportunity_id=opp_id)
         update_opportunity(opp_id, tailored_resume=result.get("tailored_resume", ""))
         return jsonify(result)
+
+    @app.route("/opportunity/<int:opp_id>/generate-cover-letter", methods=["POST"])
+    def generate_cover_letter_route(opp_id):
+        from modules.ai_engine import generate_cover_letter
+        opp = get_opportunity(opp_id)
+        if not opp:
+            return jsonify({"error": "Opportunity not found"}), 404
+        if not opp.jd_raw:
+            return jsonify({"error": "No JD text on this opportunity. Add a job description first."}), 400
+        try:
+            resume_text = open(RESUME_CACHE_PATH).read().strip()
+        except FileNotFoundError:
+            return jsonify({"error": "No resume found. Add your resume in Settings."}), 400
+        if len(resume_text) < 100:
+            return jsonify({"error": "Resume too short. Update it in Settings."}), 400
+        result = generate_cover_letter(
+            resume_text, opp.jd_raw, opp.company, opp.role_title, opportunity_id=opp_id
+        )
+        update_opportunity(opp_id, cover_letter=result.get("cover_letter", ""))
+        return jsonify({"ok": True, "cover_letter": result.get("cover_letter", "")})
+
+    @app.route("/opportunity/<int:opp_id>/export-resume")
+    def export_resume_docx(opp_id):
+        from modules.docx_builder import build_resume_docx
+        opp = get_opportunity(opp_id)
+        if not opp or not opp.tailored_resume:
+            return redirect(url_for("opportunity_detail", opp_id=opp_id))
+        settings = _load_app_settings()
+        template_path = settings.get("resume_template_path", "").strip() or None
+        docx_bytes = build_resume_docx(opp.tailored_resume, template_path)
+        safe_company = re.sub(r"[^\w\-]", "_", opp.company or "company")
+        safe_role = re.sub(r"[^\w\-]", "_", opp.role_title or "role")
+        filename = f"{safe_company}_{safe_role}_resume.docx"
+        resp = make_response(docx_bytes)
+        resp.headers["Content-Type"] = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return resp
+
+    @app.route("/opportunity/<int:opp_id>/export-cover-letter")
+    def export_cover_letter_docx(opp_id):
+        from modules.docx_builder import build_cover_letter_docx
+        opp = get_opportunity(opp_id)
+        if not opp or not opp.cover_letter:
+            return redirect(url_for("opportunity_detail", opp_id=opp_id))
+        settings = _load_app_settings()
+        template_path = settings.get("cover_letter_template_path", "").strip() or None
+        docx_bytes = build_cover_letter_docx(opp.cover_letter, template_path)
+        safe_company = re.sub(r"[^\w\-]", "_", opp.company or "company")
+        safe_role = re.sub(r"[^\w\-]", "_", opp.role_title or "role")
+        filename = f"{safe_company}_{safe_role}_cover_letter.docx"
+        resp = make_response(docx_bytes)
+        resp.headers["Content-Type"] = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return resp
 
     @app.route("/opportunity/<int:opp_id>/add-contact", methods=["POST"])
     def add_contact_route(opp_id):
@@ -479,6 +549,8 @@ def register_routes(app):
         smtp_port = app_settings.get("smtp_port", str(SMTP_PORT))
         smtp_from = app_settings.get("smtp_from", SMTP_FROM)
         sender_name = app_settings.get("sender_name", SENDER_NAME)
+        resume_template_path = app_settings.get("resume_template_path", "")
+        cover_letter_template_path = app_settings.get("cover_letter_template_path", "")
 
         # --- Load resume text ---
         resume_text = ""
@@ -502,6 +574,17 @@ def register_routes(app):
                     return redirect(url_for("settings") + "?saved=1")
                 except Exception as e:
                     error = f"Could not save feed settings: {e}"
+            elif section == "templates":
+                resume_template_path = request.form.get("resume_template_path", "").strip()
+                cover_letter_template_path = request.form.get("cover_letter_template_path", "").strip()
+                try:
+                    app_settings["resume_template_path"] = resume_template_path
+                    app_settings["cover_letter_template_path"] = cover_letter_template_path
+                    with open(APP_SETTINGS_PATH, "w", encoding="utf-8") as f:
+                        json.dump(app_settings, f, indent=2)
+                    return redirect(url_for("settings") + "?saved=1")
+                except Exception as e:
+                    error = f"Could not save template settings: {e}"
             elif section == "smtp":
                 smtp_host = request.form.get("smtp_host", "").strip() or SMTP_HOST
                 smtp_port = request.form.get("smtp_port", "").strip() or str(SMTP_PORT)
@@ -545,6 +628,8 @@ def register_routes(app):
             smtp_host=smtp_host, smtp_port=smtp_port,
             smtp_from=smtp_from, sender_name=sender_name,
             feed_urls_text=feed_urls_text, feed_keywords_text=feed_keywords_text,
+            resume_template_path=resume_template_path,
+            cover_letter_template_path=cover_letter_template_path,
         )
 
     @app.route("/metrics")

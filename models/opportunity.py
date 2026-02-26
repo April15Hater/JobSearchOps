@@ -32,6 +32,7 @@ class Opportunity:
     notes: Optional[str] = None
     ai_fit_summary: Optional[str] = None  # JSON string
     tailored_resume: Optional[str] = None
+    cover_letter: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

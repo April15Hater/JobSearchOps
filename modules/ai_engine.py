@@ -283,6 +283,57 @@ Include a subject line on the first line formatted as: Subject: <subject>"""
         raise
 
 
+def generate_cover_letter(
+    resume_text: str,
+    jd_text: str,
+    company: str,
+    role_title: str,
+    opportunity_id: int = None,
+) -> dict:
+    """
+    Write a cover letter tailored to the role.
+    Returns {cover_letter: str} — plain text, paragraphs separated by \\n\\n.
+    """
+    system_prompt = (
+        "You are a professional cover letter writer for data and analytics leadership roles in fintech. "
+        "Write a concise, genuine cover letter — under 350 words. "
+        "No hollow phrases. Never use 'thrilled', 'excited', 'passionate', 'leverage', 'synergy'. "
+        "Sound like a real person making a direct, confident case. "
+        "Respond ONLY with valid JSON. No explanation outside the JSON object."
+    )
+    user_message = f"""Write a cover letter for:
+Role: {role_title} at {company}
+
+Candidate background:
+{OWNER_BACKGROUND_SUMMARY}
+
+RESUME (for context):
+{resume_text}
+
+JOB DESCRIPTION:
+{jd_text}
+
+Rules:
+- Opening: state the role and one concrete reason you're a fit — no flattery
+- Middle 1-2 paragraphs: specific evidence from your background that matches the JD
+- Closing: clear, low-key call to action
+- Paragraphs separated by blank lines
+
+Return this JSON:
+{{
+  "cover_letter": "<full cover letter as plain text, paragraphs separated by \\n\\n>"
+}}"""
+
+    try:
+        response_text = call_claude(system_prompt, user_message, max_tokens=700)
+        result = _parse_json_response(response_text)
+        _log_ai_action("generate_cover_letter", opportunity_id=opportunity_id)
+        return result
+    except Exception as e:
+        logger.error(f"generate_cover_letter failed: {e}")
+        raise
+
+
 def generate_tailored_resume(resume_text: str, jd_text: str, opportunity_id: int = None) -> dict:
     """
     Rewrite the candidate's full resume tailored to a specific JD.
