@@ -31,6 +31,7 @@ class Opportunity:
     next_action_date: Optional[str] = None
     notes: Optional[str] = None
     ai_fit_summary: Optional[str] = None  # JSON string
+    tailored_resume: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

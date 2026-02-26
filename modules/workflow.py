@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 STAGE_TRANSITIONS: dict[str, tuple[str, int]] = {
-    "Prospect":         ("Find contact and send outreach", 1),
+    "Prospect":         ("Find contact and send outreach", 0),
     "Warm Lead":        ("Follow up if no response in 3 days", 3),
     "Applied":          ("Follow up with contact; check for recruiter screen", 5),
     "Recruiter Screen": ("Send thank-you; await HM invite", 1),
@@ -62,7 +62,7 @@ def get_followup_queue() -> list[dict]:
     return [dict(r) for r in rows] if rows else []
 
 
-def advance_stage(opportunity_id: int, new_stage: str, note: str = None) -> None:
+def advance_stage(opportunity_id: int, new_stage: str, note: str = None, close_reason: str = None) -> None:
     """
     Update an opportunity's stage, recalculate next_action_date, and log to activity_log.
     """
@@ -81,6 +81,8 @@ def advance_stage(opportunity_id: int, new_stage: str, note: str = None) -> None
     }
     if new_stage == "Closed":
         update_kwargs["date_closed"] = date.today().isoformat()
+        if close_reason:
+            update_kwargs["close_reason"] = close_reason
     if new_stage == "Applied" and old_stage != "Applied":
         update_kwargs["date_applied"] = date.today().isoformat()
 

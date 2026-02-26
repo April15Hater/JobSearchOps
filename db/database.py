@@ -49,6 +49,15 @@ def init_db():
     conn.executescript(sql)
     conn.commit()
     logger.info("Database initialized successfully.")
+    # Migrations: add new columns to existing tables (idempotent)
+    for migration_sql in [
+        "ALTER TABLE opportunities ADD COLUMN tailored_resume TEXT",
+    ]:
+        try:
+            conn.execute(migration_sql)
+            conn.commit()
+        except Exception:
+            pass  # column already exists
 
 
 def execute_query(sql: str, params: tuple = (), *, fetch: str = None):

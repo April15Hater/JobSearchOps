@@ -283,6 +283,46 @@ Include a subject line on the first line formatted as: Subject: <subject>"""
         raise
 
 
+def generate_tailored_resume(resume_text: str, jd_text: str, opportunity_id: int = None) -> dict:
+    """
+    Rewrite the candidate's full resume tailored to a specific JD.
+    Returns {tailored_resume: str, key_changes: list[str]}
+    """
+    system_prompt = (
+        "You are an expert resume writer specializing in data and analytics leadership roles in fintech. "
+        "Given the candidate's existing resume and a job description, rewrite the full resume tailored "
+        "to that role. Preserve all true experience — never fabricate metrics or responsibilities. "
+        "Optimize for ATS keywords from the JD without keyword-stuffing. "
+        "Respond ONLY with valid JSON. No explanation outside the JSON object."
+    )
+    user_message = f"""Candidate background:
+{OWNER_BACKGROUND_SUMMARY}
+
+EXISTING RESUME:
+{resume_text}
+
+JOB DESCRIPTION:
+{jd_text}
+
+Rewrite the full resume optimized for this role. Keep all sections (Summary, Experience, Skills, Education).
+Preserve every metric and number exactly. Mirror JD terminology naturally.
+
+Return this JSON:
+{{
+  "tailored_resume": "<full rewritten resume as plain text>",
+  "key_changes": ["<change 1>", "<change 2>", "<change 3>", "<change 4>", "<change 5>"]
+}}"""
+
+    try:
+        response_text = call_claude(system_prompt, user_message, max_tokens=3000)
+        result = _parse_json_response(response_text)
+        _log_ai_action("generate_tailored_resume", opportunity_id=opportunity_id)
+        return result
+    except Exception as e:
+        logger.error(f"generate_tailored_resume failed: {e}")
+        raise
+
+
 def generate_daily_digest(
     today_queue: list[dict],
     followup_needed: list[dict],

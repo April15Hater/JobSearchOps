@@ -127,8 +127,9 @@ def register_routes(app):
     def advance_opp(opp_id):
         new_stage = request.form.get("new_stage")
         note = request.form.get("note", "")
+        close_reason = request.form.get("close_reason") or None
         if new_stage:
-            advance_stage(opp_id, new_stage, note=note or None)
+            advance_stage(opp_id, new_stage, note=note or None, close_reason=close_reason)
         return redirect(url_for("opportunity_detail", opp_id=opp_id))
 
     @app.route("/opportunity/<int:opp_id>/note", methods=["POST"])
@@ -205,6 +206,24 @@ def register_routes(app):
         if not opp.jd_raw:
             return jsonify({"error": "No JD text found for this opportunity."}), 400
         result = generate_interview_prep(opp.role_title, opp.company, opp.jd_raw, opp_id)
+        return jsonify(result)
+
+    @app.route("/opportunity/<int:opp_id>/generate-resume", methods=["POST"])
+    def generate_resume_route(opp_id):
+        from modules.ai_engine import generate_tailored_resume
+        opp = get_opportunity(opp_id)
+        if not opp:
+            return jsonify({"error": "Opportunity not found"}), 404
+        if not opp.jd_raw:
+            return jsonify({"error": "No JD text on this opportunity. Add a job description first."}), 400
+        try:
+            resume_text = open(RESUME_CACHE_PATH).read().strip()
+        except FileNotFoundError:
+            return jsonify({"error": "No resume found. Add your resume in Settings."}), 400
+        if len(resume_text) < 100:
+            return jsonify({"error": "Resume too short. Update it in Settings."}), 400
+        result = generate_tailored_resume(resume_text, opp.jd_raw, opportunity_id=opp_id)
+        update_opportunity(opp_id, tailored_resume=result.get("tailored_resume", ""))
         return jsonify(result)
 
     @app.route("/opportunity/<int:opp_id>/add-contact", methods=["POST"])
