@@ -223,21 +223,24 @@
           <span class="badge badge-gray">{{ c.contact_type or 'Contact' }}</span>
           {% if c.outreach_day0 %}<span style="font-size:11px;color:#64748b">Day 0: {{ c.outreach_day0 }}</span>{% endif %}
         </div>
-        <!-- Draft Outreach toggle -->
-        <div style="margin-top:8px">
+        <!-- Direct mark-sent + Draft Outreach -->
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          {% if not c.outreach_day0 %}
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;border:1px solid #475569" id="direct-mark-{{ c.id }}" onclick="markSent({{ c.id }}, this)">Mark as Sent</button>
+          {% endif %}
           <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="toggleOutreach({{ c.id }})">Draft Outreach</button>
-          <div id="outreach-{{ c.id }}" style="display:none;margin-top:10px">
-            <div class="form-group">
-              <label>Hook — why you're reaching out</label>
-              <textarea id="hook-{{ c.id }}" rows="2" placeholder="e.g. We were both at FinTech Summit, or I saw you lead the data platform rebuild at Acme..."></textarea>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:8px">
-              <button class="btn btn-primary btn-sm" onclick="draftOutreach({{ c.id }}, this)">Generate</button>
-              <button class="btn btn-ghost btn-sm" onclick="toggleOutreach({{ c.id }})">Cancel</button>
-            </div>
-            <div id="outreach-error-{{ c.id }}" style="display:none;color:#ef4444;font-size:12px;margin-bottom:8px"></div>
-            <div id="outreach-result-{{ c.id }}" style="display:none"></div>
+        </div>
+        <div id="outreach-{{ c.id }}" style="display:none;margin-top:10px">
+          <div class="form-group">
+            <label>Hook — why you're reaching out</label>
+            <textarea id="hook-{{ c.id }}" rows="2" placeholder="e.g. We were both at FinTech Summit, or I saw you lead the data platform rebuild at Acme..."></textarea>
           </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button class="btn btn-primary btn-sm" onclick="draftOutreach({{ c.id }}, this)">Generate</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleOutreach({{ c.id }})">Cancel</button>
+          </div>
+          <div id="outreach-error-{{ c.id }}" style="display:none;color:#ef4444;font-size:12px;margin-bottom:8px"></div>
+          <div id="outreach-result-{{ c.id }}" style="display:none"></div>
         </div>
         <!-- Draft Thank You toggle -->
         <div style="margin-top:6px">
@@ -749,6 +752,8 @@ function markSent(cId, btn) {
       btn.style.background = '#10b981';
       btn.style.color = '#fff';
       btn.style.border = 'none';
+      // Reload so stage badge and Next Action card reflect the stage advance
+      setTimeout(() => location.reload(), 800);
     })
     .catch(() => {
       btn.disabled = false;

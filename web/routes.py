@@ -81,6 +81,11 @@ def register_routes(app):
         today_str = date.today().isoformat()
         if not contact.outreach_day0:
             update_contact(contact_id, outreach_day0=today_str)
+            # Advance opportunity from Prospect → Warm Lead
+            if contact.opportunity_id:
+                opp = get_opportunity(contact.opportunity_id)
+                if opp and opp.stage == "Prospect":
+                    advance_stage(contact.opportunity_id, "Warm Lead", note="Outreach sent")
         log_activity(
             activity_type="Outreach Sent",
             description=f"Outreach marked as sent to {contact.full_name}",
@@ -520,6 +525,11 @@ def register_routes(app):
         today_str = date.today().isoformat()
         if email_type == "outreach" and not contact.outreach_day0:
             update_contact(contact_id, outreach_day0=today_str)
+            # Advance opportunity from Prospect → Warm Lead
+            if contact.opportunity_id:
+                opp = get_opportunity(contact.opportunity_id)
+                if opp and opp.stage == "Prospect":
+                    advance_stage(contact.opportunity_id, "Warm Lead", note="Outreach email sent")
         activity_label = "Outreach Sent" if email_type == "outreach" else "Follow-Up Sent"
         log_activity(
             activity_type=activity_label,
